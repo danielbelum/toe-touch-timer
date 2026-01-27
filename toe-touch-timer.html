@@ -1,0 +1,544 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Toe-Touch Flexibility Timer</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+            color: #fff;
+        }
+
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        h1 {
+            font-size: 2em;
+            margin-bottom: 10px;
+        }
+
+        .streak {
+            font-size: 1.2em;
+            opacity: 0.9;
+        }
+
+        .session-buttons {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-bottom: 30px;
+        }
+
+        button {
+            background: rgba(255, 255, 255, 0.2);
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            color: white;
+            padding: 20px;
+            border-radius: 12px;
+            font-size: 1.1em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            backdrop-filter: blur(10px);
+        }
+
+        button:hover {
+            background: rgba(255, 255, 255, 0.3);
+            transform: translateY(-2px);
+        }
+
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .timer-display {
+            background: rgba(255, 255, 255, 0.15);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 40px;
+            text-align: center;
+            margin-bottom: 20px;
+            display: none;
+        }
+
+        .timer-display.active {
+            display: block;
+        }
+
+        .current-stretch {
+            font-size: 1.8em;
+            margin-bottom: 20px;
+            font-weight: 600;
+        }
+
+        .time-remaining {
+            font-size: 4em;
+            font-weight: 700;
+            margin: 20px 0;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 8px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 4px;
+            overflow: hidden;
+            margin-top: 20px;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: #4ade80;
+            transition: width 0.3s;
+            border-radius: 4px;
+        }
+
+        .stretch-count {
+            font-size: 1.1em;
+            opacity: 0.8;
+            margin-top: 15px;
+        }
+
+        .control-buttons {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        .control-buttons button {
+            flex: 1;
+            padding: 15px;
+        }
+
+        .history {
+            background: rgba(255, 255, 255, 0.15);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 30px;
+            margin-top: 30px;
+        }
+
+        .history h2 {
+            margin-bottom: 20px;
+            font-size: 1.5em;
+        }
+
+        .history-list {
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .history-item {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .history-date {
+            font-weight: 600;
+        }
+
+        .history-session {
+            opacity: 0.8;
+        }
+
+        .status-message {
+            text-align: center;
+            font-size: 1.1em;
+            margin-top: 20px;
+            opacity: 0.9;
+        }
+
+        .prep-phase {
+            color: #fbbf24;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🧘 Toe-Touch Timer</h1>
+            <div class="streak">🔥 Current Streak: <span id="streak">0</span> days</div>
+        </header>
+
+        <div class="session-buttons">
+            <button id="morningBtn" onclick="startSession('morning')">
+                ☀️ Morning Session<br>
+                <small style="opacity: 0.7;">Dynamic (5 min)</small>
+            </button>
+            <button id="eveningBtn" onclick="startSession('evening')">
+                🌙 Evening Session<br>
+                <small style="opacity: 0.7;">Static (5 min)</small>
+            </button>
+        </div>
+
+        <div id="timerDisplay" class="timer-display">
+            <div class="current-stretch" id="stretchName">Get Ready...</div>
+            <div class="time-remaining" id="timeRemaining">00:00</div>
+            <div class="stretch-count" id="stretchCount">Stretch 0 of 0</div>
+            <div class="progress-bar">
+                <div class="progress-fill" id="progressFill" style="width: 0%"></div>
+            </div>
+            <div class="status-message" id="statusMessage"></div>
+            <div class="control-buttons">
+                <button id="pauseBtn" onclick="togglePause()">⏸️ Pause</button>
+                <button id="stopBtn" onclick="stopSession()">⏹️ Stop</button>
+            </div>
+        </div>
+
+        <div class="history">
+            <h2>📊 Session History</h2>
+            <div class="history-list" id="historyList">
+                <p style="opacity: 0.6;">No sessions completed yet. Start your first one!</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Session definitions
+        const sessions = {
+            morning: [
+                { name: "Standing Forward Fold", duration: 60 },
+                { name: "Downward Dog", duration: 45 },
+                { name: "Standing Hamstring Stretch - Right Leg", duration: 45 },
+                { name: "Standing Hamstring Stretch - Left Leg", duration: 45 },
+                { name: "Cat-Cow", duration: 60 },
+                { name: "Standing Pike Stretch", duration: 45 }
+            ],
+            evening: [
+                { name: "Seated Forward Fold", duration: 90 },
+                { name: "Single-Leg Forward Fold - Right Leg", duration: 45 },
+                { name: "Single-Leg Forward Fold - Left Leg", duration: 45 },
+                { name: "Supine Hamstring Stretch - Right Leg", duration: 45 },
+                { name: "Supine Hamstring Stretch - Left Leg", duration: 45 },
+                { name: "Standing Straddle Fold", duration: 60 }
+            ]
+        };
+
+        // State
+        let currentSession = null;
+        let currentStretchIndex = 0;
+        let timeRemaining = 0;
+        let totalTime = 0;
+        let timerInterval = null;
+        let isPaused = false;
+        let isPrepping = false;
+        let audioContext = null;
+        let backgroundOscillator = null;
+
+        // Audio context setup
+        function initAudio() {
+            if (!audioContext) {
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            }
+        }
+
+        // Background tone
+        function startBackgroundTone() {
+            if (backgroundOscillator) return;
+            initAudio();
+            backgroundOscillator = audioContext.createOscillator();
+            const gainNode = audioContext.createGain();
+            backgroundOscillator.connect(gainNode);
+            gainNode.connect(audioContext.destination);
+            backgroundOscillator.frequency.value = 220; // A3 note
+            gainNode.gain.value = 0.05; // Very quiet
+            backgroundOscillator.start();
+        }
+
+        function stopBackgroundTone() {
+            if (backgroundOscillator) {
+                backgroundOscillator.stop();
+                backgroundOscillator = null;
+            }
+        }
+
+        // Text-to-speech
+        function speak(text) {
+            const utterance = new SpeechSynthesisUtterance(text);
+            utterance.rate = 1.0;
+            utterance.pitch = 1.0;
+            utterance.volume = 1.0;
+            speechSynthesis.speak(utterance);
+        }
+
+        // Beep sound
+        function playBeep(frequency = 800, duration = 0.2) {
+            initAudio();
+            const oscillator = audioContext.createOscillator();
+            const gainNode = audioContext.createGain();
+            oscillator.connect(gainNode);
+            gainNode.connect(audioContext.destination);
+            oscillator.frequency.value = frequency;
+            gainNode.gain.value = 0.3;
+            oscillator.start();
+            oscillator.stop(audioContext.currentTime + duration);
+        }
+
+        // Format time
+        function formatTime(seconds) {
+            const mins = Math.floor(seconds / 60);
+            const secs = seconds % 60;
+            return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+        }
+
+        // Start session
+        function startSession(type) {
+            initAudio();
+            currentSession = sessions[type];
+            currentStretchIndex = 0;
+            isPaused = false;
+            
+            // Calculate total time
+            totalTime = currentSession.reduce((sum, s) => sum + s.duration, 0) + (currentSession.length * 5); // Add prep time
+            
+            // Update UI
+            document.getElementById('timerDisplay').classList.add('active');
+            document.getElementById('morningBtn').disabled = true;
+            document.getElementById('eveningBtn').disabled = true;
+            
+            // Start background tone
+            startBackgroundTone();
+            
+            // Start first prep phase
+            startPrepPhase();
+        }
+
+        // Start prep phase
+        function startPrepPhase() {
+            isPrepping = true;
+            const stretch = currentSession[currentStretchIndex];
+            timeRemaining = 5;
+            
+            document.getElementById('stretchName').textContent = stretch.name;
+            document.getElementById('stretchName').classList.add('prep-phase');
+            document.getElementById('statusMessage').textContent = 'Get into position...';
+            document.getElementById('statusMessage').classList.add('prep-phase');
+            document.getElementById('stretchCount').textContent = `Stretch ${currentStretchIndex + 1} of ${currentSession.length}`;
+            
+            speak(`Get ready for ${stretch.name}. ${stretch.duration} seconds.`);
+            playBeep(600, 0.15);
+            
+            runTimer();
+        }
+
+        // Start stretch phase
+        function startStretchPhase() {
+            isPrepping = false;
+            const stretch = currentSession[currentStretchIndex];
+            timeRemaining = stretch.duration;
+            
+            document.getElementById('stretchName').classList.remove('prep-phase');
+            document.getElementById('statusMessage').textContent = 'Hold the stretch...';
+            document.getElementById('statusMessage').classList.remove('prep-phase');
+            
+            speak("Begin");
+            playBeep(800, 0.2);
+            
+            runTimer();
+        }
+
+        // Run timer
+        function runTimer() {
+            if (timerInterval) clearInterval(timerInterval);
+            
+            updateDisplay();
+            
+            timerInterval = setInterval(() => {
+                if (!isPaused) {
+                    timeRemaining--;
+                    updateDisplay();
+                    
+                    if (timeRemaining <= 0) {
+                        clearInterval(timerInterval);
+                        nextStretch();
+                    }
+                }
+            }, 1000);
+        }
+
+        // Update display
+        function updateDisplay() {
+            document.getElementById('timeRemaining').textContent = formatTime(timeRemaining);
+            
+            // Calculate progress
+            const elapsed = totalTime - timeRemaining - (currentSession.length - currentStretchIndex - 1) * 5 - currentSession.slice(currentStretchIndex + 1).reduce((sum, s) => sum + s.duration, 0);
+            if (!isPrepping) {
+                const currentStretchElapsed = currentSession[currentStretchIndex].duration - timeRemaining;
+                const progress = ((elapsed + currentStretchElapsed) / totalTime) * 100;
+                document.getElementById('progressFill').style.width = progress + '%';
+            }
+        }
+
+        // Next stretch
+        function nextStretch() {
+            playBeep(1000, 0.3);
+            
+            if (isPrepping) {
+                startStretchPhase();
+            } else {
+                currentStretchIndex++;
+                
+                if (currentStretchIndex < currentSession.length) {
+                    startPrepPhase();
+                } else {
+                    completeSession();
+                }
+            }
+        }
+
+        // Complete session
+        function completeSession() {
+            clearInterval(timerInterval);
+            stopBackgroundTone();
+            
+            speak("Session complete! Great work!");
+            playBeep(1200, 0.5);
+            
+            // Save to history
+            saveSession();
+            
+            // Reset UI
+            setTimeout(() => {
+                document.getElementById('timerDisplay').classList.remove('active');
+                document.getElementById('morningBtn').disabled = false;
+                document.getElementById('eveningBtn').disabled = false;
+                resetDisplay();
+            }, 2000);
+        }
+
+        // Toggle pause
+        function togglePause() {
+            isPaused = !isPaused;
+            document.getElementById('pauseBtn').textContent = isPaused ? '▶️ Resume' : '⏸️ Pause';
+            
+            if (isPaused) {
+                stopBackgroundTone();
+            } else {
+                startBackgroundTone();
+            }
+        }
+
+        // Stop session
+        function stopSession() {
+            if (confirm('Are you sure you want to stop this session?')) {
+                clearInterval(timerInterval);
+                stopBackgroundTone();
+                document.getElementById('timerDisplay').classList.remove('active');
+                document.getElementById('morningBtn').disabled = false;
+                document.getElementById('eveningBtn').disabled = false;
+                resetDisplay();
+            }
+        }
+
+        // Reset display
+        function resetDisplay() {
+            document.getElementById('stretchName').textContent = 'Get Ready...';
+            document.getElementById('timeRemaining').textContent = '00:00';
+            document.getElementById('stretchCount').textContent = 'Stretch 0 of 0';
+            document.getElementById('progressFill').style.width = '0%';
+            document.getElementById('statusMessage').textContent = '';
+            document.getElementById('pauseBtn').textContent = '⏸️ Pause';
+            currentSession = null;
+            isPaused = false;
+        }
+
+        // Save session to history
+        function saveSession() {
+            const history = JSON.parse(localStorage.getItem('stretchHistory') || '[]');
+            const sessionType = currentSession === sessions.morning ? 'Morning' : 'Evening';
+            
+            history.unshift({
+                date: new Date().toISOString(),
+                session: sessionType,
+                completed: true
+            });
+            
+            localStorage.setItem('stretchHistory', JSON.stringify(history));
+            updateStreak();
+            loadHistory();
+        }
+
+        // Load history
+        function loadHistory() {
+            const history = JSON.parse(localStorage.getItem('stretchHistory') || '[]');
+            const historyList = document.getElementById('historyList');
+            
+            if (history.length === 0) {
+                historyList.innerHTML = '<p style="opacity: 0.6;">No sessions completed yet. Start your first one!</p>';
+                return;
+            }
+            
+            historyList.innerHTML = history.slice(0, 20).map(item => {
+                const date = new Date(item.date);
+                const dateStr = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+                const timeStr = date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+                
+                return `
+                    <div class="history-item">
+                        <div>
+                            <div class="history-date">${dateStr}</div>
+                            <div class="history-session">${item.session} • ${timeStr}</div>
+                        </div>
+                        <div>✅</div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // Update streak
+        function updateStreak() {
+            const history = JSON.parse(localStorage.getItem('stretchHistory') || '[]');
+            let streak = 0;
+            let currentDate = new Date();
+            currentDate.setHours(0, 0, 0, 0);
+            
+            // Count consecutive days
+            for (let i = 0; i < history.length; i++) {
+                const sessionDate = new Date(history[i].date);
+                sessionDate.setHours(0, 0, 0, 0);
+                
+                const daysDiff = Math.floor((currentDate - sessionDate) / (1000 * 60 * 60 * 24));
+                
+                if (daysDiff === streak) {
+                    streak++;
+                } else if (daysDiff > streak) {
+                    break;
+                }
+            }
+            
+            document.getElementById('streak').textContent = streak;
+        }
+
+        // Initialize on load
+        window.onload = () => {
+            loadHistory();
+            updateStreak();
+        };
+    </script>
+</body>
+</html>
