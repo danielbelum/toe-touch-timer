@@ -248,7 +248,8 @@
         let isPaused = false;
         let isPrepping = false;
         let audioContext = null;
-        let backgroundOscillator = null;
+        let backgroundMusic = null;
+        let wakeLock = null;
 
         // Audio context setup
         function initAudio() {
@@ -257,24 +258,36 @@
             }
         }
 
-        // Background tone
+        // Screen wake lock for mobile
+        async function requestWakeLock() {
+            try {
+                if ('wakeLock' in navigator) {
+                    wakeLock = await navigator.wakeLock.request('screen');
+                    console.log('Wake lock active');
+                    
+                    wakeLock.addEventListener('release', () => {
+                        console.log('Wake lock released');
+                    });
+                }
+            } catch (err) {
+                console.log('Wake lock error:', err);
+            }
+        }
+
+        function releaseWakeLock() {
+            if (wakeLock) {
+                wakeLock.release();
+                wakeLock = null;
+            }
+        }
+
+        // Background ambient music - REMOVED, no background sound
         function startBackgroundTone() {
-            if (backgroundOscillator) return;
-            initAudio();
-            backgroundOscillator = audioContext.createOscillator();
-            const gainNode = audioContext.createGain();
-            backgroundOscillator.connect(gainNode);
-            gainNode.connect(audioContext.destination);
-            backgroundOscillator.frequency.value = 220; // A3 note
-            gainNode.gain.value = 0.05; // Very quiet
-            backgroundOscillator.start();
+            // No background music - silent
         }
 
         function stopBackgroundTone() {
-            if (backgroundOscillator) {
-                backgroundOscillator.stop();
-                backgroundOscillator = null;
-            }
+            // No background music to stop
         }
 
         // Text-to-speech
@@ -309,6 +322,7 @@
         // Start session
         function startSession(type) {
             initAudio();
+            requestWakeLock(); // Keep screen awake
             currentSession = sessions[type];
             currentStretchIndex = 0;
             isPaused = false;
@@ -415,6 +429,7 @@
         function completeSession() {
             clearInterval(timerInterval);
             stopBackgroundTone();
+            releaseWakeLock(); // Allow screen to sleep again
             
             speak("Session complete! Great work!");
             playBeep(1200, 0.5);
@@ -448,6 +463,7 @@
             if (confirm('Are you sure you want to stop this session?')) {
                 clearInterval(timerInterval);
                 stopBackgroundTone();
+                releaseWakeLock(); // Allow screen to sleep again
                 document.getElementById('timerDisplay').classList.remove('active');
                 document.getElementById('morningBtn').disabled = false;
                 document.getElementById('eveningBtn').disabled = false;
